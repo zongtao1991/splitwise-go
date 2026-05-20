@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SplitEase - AA分账</title>
+<link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+<div id="app">
+  <nav class="topbar">
+    <h1 onclick="navigate('/')">💰 SplitEase</h1>
+    <div class="nav-actions">
+      <button onclick="showCreateGroup()" class="btn btn-primary">+ 新建分组</button>
+    </div>
+  </nav>
+
+  <!-- Home: group list -->
+  <div id="page-home" class="page">
+    <div class="section-header">
+      <h2>我的分组</h2>
+    </div>
+    <div id="group-list" class="card-grid"></div>
+    <div id="no-groups" class="empty-state" style="display:none">
+      <p>还没有分组，创建一个吧 👆</p>
+    </div>
+  </div>
+
+  <!-- Group detail -->
+  <div id="page-group" class="page" style="display:none">
+    <div class="group-header">
+      <button onclick="navigate('/')" class="btn btn-back">← 返回</button>
+      <h2 id="group-name"></h2>
+      <span id="group-currency" class="badge"></span>
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" data-tab="tab-members" onclick="switchTab(this)">成员</button>
+      <button class="tab" data-tab="tab-expenses" onclick="switchTab(this)">支出</button>
+      <button class="tab" data-tab="tab-balances" onclick="switchTab(this)">余额</button>
+      <button class="tab" data-tab="tab-settle" onclick="switchTab(this)">结算</button>
+      <button class="tab" data-tab="tab-stats" onclick="switchTab(this)">统计</button>
+    </div>
+
+    <!-- Members tab -->
+    <div id="tab-members" class="tab-content active">
+      <div class="toolbar">
+        <select id="member-select"><option value="">选择已有成员...</option></select>
+        <button onclick="addMemberToGroup()" class="btn btn-sm">添加</button>
+        <span class="sep">|</span>
+        <input id="new-member-name" placeholder="新成员昵称" class="input-sm">
+        <button onclick="createAndAddMember()" class="btn btn-sm btn-primary">创建并添加</button>
+      </div>
+      <div id="member-list" class="member-chips"></div>
+    </div>
+
+    <!-- Expenses tab -->
+    <div id="tab-expenses" class="tab-content" style="display:none">
+      <div class="toolbar">
+        <button onclick="showAddExpense()" class="btn btn-primary">+ 记一笔</button>
+      </div>
+      <div id="expense-list"></div>
+      <div id="expense-pagination" class="pagination"></div>
+    </div>
+
+    <!-- Balances tab -->
+    <div id="tab-balances" class="tab-content" style="display:none">
+      <div id="balance-list"></div>
+    </div>
+
+    <!-- Settlement tab -->
+    <div id="tab-settle" class="tab-content" style="display:none">
+      <div class="toolbar">
+        <button onclick="loadSuggestions()" class="btn btn-primary">💡 智能结算建议</button>
+      </div>
+      <div id="settlement-suggestions"></div>
+      <h3>结算历史</h3>
+      <div id="settlement-history"></div>
+    </div>
+
+    <!-- Stats tab -->
+    <div id="tab-stats" class="tab-content" style="display:none">
+      <div id="stats-content"></div>
+    </div>
+  </div>
+
+  <!-- Create Group Modal -->
+  <div id="modal-create-group" class="modal" style="display:none">
+    <div class="modal-content">
+      <h3>新建分组</h3>
+      <label>分组名称</label>
+      <input id="cg-name" placeholder="如：日本旅行">
+      <label>描述</label>
+      <input id="cg-desc" placeholder="可选">
+      <label>默认币种</label>
+      <select id="cg-currency">
+        <option value="CNY">CNY 人民币</option>
+        <option value="USD">USD 美元</option>
+        <option value="EUR">EUR 欧元</option>
+        <option value="JPY">JPY 日元</option>
+      </select>
+      <div class="modal-actions">
+        <button onclick="closeModal('modal-create-group')" class="btn">取消</button>
+        <button onclick="createGroup()" class="btn btn-primary">创建</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Expense Modal -->
+  <div id="modal-add-expense" class="modal" style="display:none">
+    <div class="modal-content modal-wide">
+      <h3>记一笔支出</h3>
+      <label>金额</label>
+      <input id="ex-amount" type="number" step="0.01" placeholder="0.00">
+      <label>付款人</label>
+      <select id="ex-payer"></select>
+      <label>币种</label>
+      <select id="ex-currency">
+        <option value="">同分组默认</option>
+        <option value="CNY">CNY</option>
+        <option value="USD">USD</option>
+        <option value="EUR">EUR</option>
+        <option value="JPY">JPY</option>
+      </select>
+      <label>汇率（1外币=?默认币种）</label>
+      <input id="ex-rate" type="number" step="0.0001" placeholder="1.0" value="1">
+      <label>备注</label>
+      <input id="ex-desc" placeholder="吃了啥/买了啥">
+      <label>日期</label>
+      <input id="ex-date" type="date">
+      <label>分摊方式</label>
+      <select id="ex-split-type" onchange="updateSplitUI()">
+        <option value="equal">均摊</option>
+        <option value="percentage">按比例</option>
+        <option value="exact">指定金额</option>
+      </select>
+      <div id="split-members"></div>
+      <div id="split-validation" style="color:#dc3545;font-size:13px;margin-top:8px;display:none"></div>
+      <div class="modal-actions">
+        <button onclick="closeModal('modal-add-expense')" class="btn">取消</button>
+        <button onclick="submitExpense()" class="btn btn-primary">提交</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settlement Confirm Modal -->
+  <div id="modal-settle-confirm" class="modal" style="display:none">
+    <div class="modal-content">
+      <h3>确认结算</h3>
+      <div id="settle-confirm-content" style="margin:16px 0">
+      </div>
+      <div class="modal-actions">
+        <button onclick="closeModal('modal-settle-confirm')" class="btn">取消</button>
+        <button id="btn-settle-confirm" class="btn btn-primary">确认付款</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/static/js/app.js"></script>
+</body>
+</html>
